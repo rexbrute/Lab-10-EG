@@ -1,0 +1,363 @@
+#include <graphics.h>
+#include <cstdlib>
+#include <cmath>
+#include <cstring>
+#include <iostream>
+ 
+using namespace std;
+ 
+void waitForLeftMouseClick()
+{
+    clearmouseclick(WM_LBUTTONDOWN);
+    const int DELAY = 50; // Milliseconds of delay between checks
+    int x, y;
+    while (!ismouseclick(WM_LBUTTONDOWN))
+        delay(DELAY);
+    getmouseclick(WM_LBUTTONDOWN, x, y);
+}
+ 
+struct point{float x;float y;};
+ 
+typedef struct nod{
+    int x,y;
+    struct nod* next;
+}nod;
+ 
+float m[]={-10,-10,0,25,10,-10,0,0,-10,-10};
+ 
+nod* lista=NULL;
+ 
+// simple linear interpolation between two points
+void lerp(point& dest, const point& a, const point& b, const float t)
+{
+    dest.x = a.x + (b.x-a.x)*t;
+    dest.y = a.y + (b.y-a.y)*t;
+}
+ 
+// evaluate a point on a bezier-curve. t goes from 0 to 1.0
+void bezier(point &dest, const point& a, const point& b, const point& c, const point& d, const float t)
+{
+    point ab,bc,cd,abbc,bccd;
+    lerp(ab, a,b,t);           // point between a and b (green)
+    lerp(bc, b,c,t);           // point between b and c (green)
+    lerp(cd, c,d,t);           // point between c and d (green)
+    lerp(abbc, ab,bc,t);       // point between ab and bc (blue)
+    lerp(bccd, bc,cd,t);       // point between bc and cd (blue)
+    lerp(dest, abbc,bccd,t);   // point on the bezier-curve (black)
+}
+ 
+ 
+void insert(struct point p){
+    nod* t = (nod*)malloc(sizeof(nod));
+    t->x = p.x;
+    t->y = p.y;
+    t->next = NULL;
+    if(lista==NULL) lista=t;
+    else{
+        t->next=lista;
+        lista=t;
+        }
+}
+ 
+ 
+void bezier(point P[]){
+    // 4 points define the bezier-curve. These are the points used
+    // for the example-images on this page.
+    lista=NULL;
+ 
+    point a = P[0], b = P[1], c = P[2], d = P[3];
+ 
+    moveto(a.x,a.y);
+    for (int i=0; i<100; ++i)
+    {
+        point p;
+        float t = static_cast<float>(i)/99.0;
+        bezier(p,a,b,c,d,t);
+        //putpixel(p.x,p.y,RED);
+        insert(p);
+    }
+ 
+    // parcurge lista
+    nod* p = lista;moveto(p->x,p->y);
+    while(p){lineto(p->x,p->y);p=p->next;}
+}
+ 
+ 
+ 
+// inversare lista simplu inlantuita
+void inversare(){
+    nod *u,*p = lista;
+    while(p->next){
+        u = p->next;
+        if(u->next)
+                p->next=u->next;
+        else
+                p->next=NULL;
+        u->next=lista;          // u devine capul listei
+        lista=u;
+    }
+    p=p->next;
+}
+ 
+// oglindire fata de axa verticala
+void oglOY(){
+    nod *t,*q = lista;
+ 
+    while(q){
+        t = (nod*)malloc(sizeof(nod));
+        t->x = -q->x +700;
+        t->y = q->y;
+        t->next = NULL;
+ 
+        t->next=lista;lista=t;
+        q=q->next;
+    }
+}
+ 
+// oglindire fata de axa orizontala
+void oglOX(){
+    nod* q = lista;
+    while(q){
+        nod* t = (nod*)malloc(sizeof(nod));
+        t->x = q->x;
+        t->y = -q->y + 700;
+        t->next = NULL;
+ 
+        t->next=lista;lista=t;
+        q=q->next;
+    }
+}
+ 
+ 
+void diamond(nod* p){//moveto(p->x-4,p->y);
+    outtextxy(p->x,p->y,"a");
+ 
+}
+void maloc(nod* p){//moveto(p->x-4,p->y);
+    outtextxy(p->x+75,p->y,"D");
+ 
+}
+void var(nod* p){
+outtextxy(p->x,p->y,"v");
+}
+void ias(nod* p){
+outtextxy(p->x,p->y,"i");
+}
+void saru(nod* p){
+outtextxy(p->x,p->y,"d");
+}
+ 
+ 
+ 
+ 
+nod *pp = NULL;
+ 
+ 
+// afisare obiect poligonal in pozitia p (pe traiectorie)
+void afisM(nod* p){
+    if(pp==NULL || pp==p){
+        moveto(p->x+m[0],p->y-m[1]);
+        lineto(p->x+m[2],p->y-m[3]);lineto(p->x+m[4],p->y-m[5]);
+        lineto(p->x+m[6],p->y-m[7]);lineto(p->x+m[0],p->y-m[1]);
+        return;
+    }
+ 
+    int points[10]={0};
+ 
+    double xc = p->x, yc=p->y;
+    double xp =pp->x,yp=pp->y;
+    double deltax=xc-xp,deltay=yc-yp;
+ 
+    // afiseaza centrul figurii
+    setcolor(BROWN);
+    circle((int)xc, (int)yc,5);
+    setcolor(YELLOW);
+    if(xp){
+            circle(xp,yp,3);
+    }else{
+            xp=xc; yp=yc;
+    }
+ 
+    // translatie in centru
+    for(int i=0;i<5;i++){
+            points[2*i] = m[2*i]+xc;
+            points[2*i+1]= m[2*i+1]+yc;
+    }
+ 
+    // rotatie
+    double d = sqrt(deltax*deltax + deltay*deltay);
+    if(deltax==0 && deltay==0) return;
+ 
+    double alfa=0;
+ 
+    if(deltax>0)
+        alfa = asin(deltay/d) + 3*3.14/2;
+    else
+        alfa = asin(-deltay/d) + 3.14/2;
+ 
+    double cosa = cos(alfa), sina = sin(alfa);
+    for(int i=0;i<4;i++){
+        double xi = points[2*i];
+        double yi = points[2*i+1];
+ 
+        points[2*i]   = xc + (xi-xc) * cosa - (yi-yc)*sina;
+        points[2*i+1] = yc + (xi-xc) * sina + (yi-yc)*cosa;
+    }
+ 
+    //drawpoly(5,points);
+    moveto(points[0],points[1]);
+    lineto(points[2],points[3]);lineto(points[4],points[5]);
+    lineto(points[6],points[7]);lineto(points[0],points[1]);
+ 
+    //cout << "\nh="<<h<<", alfa="<<alfa;
+    //cout << ", deltax=" << deltax <<", deltay="<<deltay;
+}
+ 
+ 
+ 
+int main()
+{
+    initwindow(800,800);
+    setwritemode(XOR_PUT);
+    settextstyle(0,0,10);
+ 
+    point c[]={350,500,     800,500,   500,800,    350,350};
+ 
+point d[]={0,0,  200,100,  200,200, 200,370};
+point v[]={800,800,  600,700,  500,300, 435,365};
+point i[]={800,0,  600,200,  800,400, 510,370};
+point D[]={0,800,  250,600,  600,700, 590,360};
+    // axele
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+    // fragment traiectorie - Bezier
+    setcolor(GREEN);bezier(c);
+inversare();
+  waitForLeftMouseClick();
+    nod *t = lista->next;
+    while(t->next){
+        diamond(t);
+ 
+        delay(20);
+        diamond(t);
+ 
+        t=t->next;
+        if(t->next==NULL)break;
+cleardevice();
+    }
+ 
+    bezier(d);
+inversare();
+ 
+ 
+ 
+    // inceputul traiectoriei
+    setcolor(YELLOW);
+t = lista->next;
+    while(t->next){
+ 
+        maloc(t);
+        delay(20);
+ 
+        maloc(t);
+        t=t->next;
+ 
+    }
+ 
+    bezier(v);
+    inversare();
+    setcolor(YELLOW);
+t = lista->next;
+    while(t->next){
+ 
+        var(t);
+        delay(20);
+ 
+        var(t);
+        t=t->next;
+ 
+    }
+    bezier(i);
+inversare();
+ 
+ 
+ 
+    // inceputul traiectoriei
+    setcolor(YELLOW);
+t = lista->next;
+    while(t->next){
+ 
+        ias(t);
+        delay(20);
+ 
+        ias(t);
+        t=t->next;
+ 
+    }
+    bezier(D);
+inversare();
+ 
+ 
+ 
+    // inceputul traiectoriei
+    setcolor(YELLOW);
+t = lista->next;
+    while(t->next){
+ 
+        saru(t);
+        delay(20);
+ 
+        saru(t);
+        t=t->next;
+ 
+    }
+    // sfarsitul traiectoriei
+    circle(t->x,t->y,5);
+    waitForLeftMouseClick();
+    cleardevice();
+ 
+    oglOY();
+    inversare();
+    oglOX();
+ 
+ 
+    // afisare traiectorie completa
+    cleardevice();
+    setcolor(GREEN);
+    circle(lista->x,lista->y,7);
+    moveto(lista->x,lista->y);
+    t = lista->next;
+    while(t->next){
+        lineto(t->x,t->y);
+        t=t->next;
+    }
+    lineto(lista->x,lista->y);
+    waitForLeftMouseClick();
+    cleardevice();
+ 
+ 
+    // scalare obiect 2D
+    for(int i=0;i<10;i++)m[i]=m[i]*2;
+ 
+    // traiectoria - lista circulara
+    setcolor(YELLOW);
+    t = lista->next;while(t->next)t=t->next;t->next=lista;
+    t = lista->next;pp = lista;
+    int h=0;
+    while(1){
+        afisM(t);       // afisare
+        delay(10);
+        afisM(t);       // stergere
+ 
+        pp=t;
+        t=t->next;
+    }
+ 
+    waitForLeftMouseClick();
+    return 0;
+}
